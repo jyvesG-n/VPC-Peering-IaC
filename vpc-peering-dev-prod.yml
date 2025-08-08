@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "VPC Peering entre le VPC Dev et le VPC Prod"
+
+Resources:
+  # VPC Dev
+  DevVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: DevVPC
+
+  DevSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DevVPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""] # On selectionne uniquement la première Zone de disponibilité 
+      Tags:
+        - Key: Name
+          Value: DevSubnet
+
+  DevRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DevVPC
+      Tags:
+        - Key: Name
+          Value: DevRouteTable
+
+  DevSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DevSubnet
+      RouteTableId: !Ref DevRouteTable
+
+  # VPC Prod
+  ProdVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: ProdVPC
+
+  ProdSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ProdVPC
+      CidrBlock: 10.10.0.0/24 
+      AvailabilityZone: !Select [0, !GetAZs ""] # On selectionne uniquement la première Zone de disponibilité 
+      Tags:
+        - Key: Name
+          Value: ProdSubnet
+
+  ProdRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ProdVPC
+      Tags:
+        - Key: Name
+          Value: ProdRouteTable
+
+  ProdSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref ProdSubnet
+      RouteTableId: !Ref ProdRouteTable
+
+  # VPC Peering entre Dev et Prod
+  DevProdPeering:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref DevVPC
+      PeerVpcId: !Ref ProdVPC
+      Tags:
+        - Key: Name
+          Value: Dev-Prod-Peering
+
+  # Route table pour le routage des données de Dev -> Prod
+  DevToProdRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref DevRouteTable
+      DestinationCidrBlock: 10.10.0.0/16
+      VpcPeeringConnectionId: !Ref DevProdPeering
+
+  # Route table pour le routage des données de  Prod -> Dev
+  ProdToDevRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref ProdRouteTable
+      DestinationCidrBlock: 10.0.0.0/16
+      VpcPeeringConnectionId: !Ref DevProdPeering
+
+# On recupère chaque ID du VPC Dev et de la Prod ainsi que l'ID Du VPC Peering dans la sortie 
+Outputs: 
+  DevVPCId:
+    Description: ID du VPC Dev
+    Value: !Ref DevVPC
+
+  ProdVPCId:
+    Description: ID du VPC Prod
+    Value: !Ref ProdVPC
+
+  VPCPeeringId:
+    Description: ID du peering
+    Value: !Ref DevProdPeering
+
